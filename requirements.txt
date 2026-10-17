@@ -7,3 +7,4 @@ qdrant-client
 ollama
 streamlit
 python-dotenv
+bcrypt

@@ -31,10 +31,20 @@ CONSULTAS = {
         WHERE status = 'encontrado'
     """,
     "Perguntas por usuário": """
-        SELECT login, COUNT(*) AS total
-        FROM auditoria
-        GROUP BY login
+        SELECT a.login, COALESCE(u.nome, '(não cadastrado)') AS nome, COUNT(*) AS total
+        FROM auditoria a
+        LEFT JOIN usuario u ON u.login = a.login
+        GROUP BY a.login, u.nome
         ORDER BY total DESC
+    """,
+    "Tentativas de login": """
+        SELECT login,
+               SUM(sucesso)      AS com_sucesso,
+               SUM(NOT sucesso)  AS com_falha,
+               DATE_FORMAT(MAX(criado_em), '%d/%m %H:%i') AS ultima
+        FROM auditoria_login
+        GROUP BY login
+        ORDER BY com_falha DESC
     """,
     "Últimas 10 perguntas": """
         SELECT DATE_FORMAT(criado_em, '%d/%m %H:%i') AS quando, login, status,
