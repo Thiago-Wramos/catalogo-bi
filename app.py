@@ -30,7 +30,7 @@ def conexoes():
     return criar_engine(), criar_qdrant()
 
 
-@st.cache_resource(show_spinner="Carregando os modelos na GPU (só na primeira vez)...")
+@st.cache_resource(show_spinner="Carregando os modelos...")
 def aquecer_modelos():
     aquecer()
     return True
@@ -56,7 +56,7 @@ engine, cliente = conexoes()
 # LOGIN
 # =====================================================================
 def pagina_login():
-    st.title("📚 Catálogo de Dados")
+    st.title("Catálogo de Dados")
     st.caption("Entre com o seu usuário para consultar o catálogo.")
 
     with st.form("login"):
@@ -92,7 +92,7 @@ def mostrar_detalhes_tecnicos(d):
 
 
 def pagina_chat(usuario, mostrar_detalhes):
-    st.title("📚 Catálogo de Dados")
+    st.title("Catálogo de Dados")
     st.caption("Pergunte em qual relatório e em qual view está a informação que você procura.")
 
     for msg in st.session_state.historico:

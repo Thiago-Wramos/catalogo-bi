@@ -1,5 +1,5 @@
-# Projeto: Catálogo de Dados com RAG (TCC)
-# Etapa 2.4 - Infraestrutura de dados: MySQL (relacional) + Qdrant (vetorial)
+# Catálogo de Dados com IA
+# MySQL (relacional) + Qdrant (vetorial) + aplicação (Streamlit)
 # O Ollama NÃO está aqui: no protótipo ele roda nativo no Windows para usar a GPU direto.
 
 name: catalogo-bi
@@ -37,6 +37,39 @@ services:
       - "127.0.0.1:6333:6333"             # API REST + dashboard web
     volumes:
       - qdrant_data:/qdrant/storage
+    mem_limit: 1g
+
+  app:
+    build: .                              # imagem construída a partir do Dockerfile desta pasta
+    container_name: catalogo-app
+    restart: unless-stopped
+    environment:
+      # Só o que a aplicação precisa. A senha de ROOT do MySQL não entra aqui.
+      MYSQL_HOST: mysql                   # nome do serviço, não "127.0.0.1"
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      QDRANT_URL: http://qdrant:6333      # nome do serviço, não "127.0.0.1"
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      OLLAMA_HOST: http://host.docker.internal:11434   # o Ollama que roda no Windows
+      # Ajustes opcionais (se não estiverem no .env, valem os padrões)
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3.5:9b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+      SCORE_MINIMO: ${SCORE_MINIMO:-0.45}
+      MARGEM_RELEVANCIA: ${MARGEM_RELEVANCIA:-0.05}
+      LIMIAR_INTENCAO: ${LIMIAR_INTENCAO:-0.70}
+      POLITICA_SEM_ACESSO: ${POLITICA_SEM_ACESSO:-indicar}
+      TZ: America/Sao_Paulo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # garante esse nome também num servidor Linux
+    ports:
+      - "127.0.0.1:8501:8501"             # a interface, só pela sua máquina
+    depends_on:
+      mysql:
+        condition: service_healthy        # só sobe quando o MySQL estiver pronto
+      qdrant:
+        condition: service_started
     mem_limit: 1g
 
 volumes:

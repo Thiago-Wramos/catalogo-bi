@@ -1,0 +1,27 @@
+# O que NÃO entra na imagem da aplicação
+
+# Segredos: a aplicação recebe as variáveis pelo docker-compose, nunca por arquivo na imagem
+.env
+
+# Histórico do Git e arquivos de editor/sistema
+.git
+.gitignore
+.vscode/
+.idea/
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dados, scripts SQL e testes: a aplicação não precisa deles para rodar
+dados/
+sql/
+testes/
+
+# Arquivos do próprio Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
