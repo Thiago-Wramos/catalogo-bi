@@ -1,0 +1,44 @@
+# Projeto: Catálogo de Dados com RAG (TCC)
+# Etapa 2.4 - Infraestrutura de dados: MySQL (relacional) + Qdrant (vetorial)
+# O Ollama NÃO está aqui: no protótipo ele roda nativo no Windows para usar a GPU direto.
+
+name: catalogo-bi
+
+services:
+
+  mysql:
+    image: mysql:8.4                      # versão LTS fixada (nunca "latest")
+    container_name: catalogo-mysql
+    restart: unless-stopped               # volta sozinho se o Docker reiniciar, salvo se você parar
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}   # valores vêm do arquivo .env
+      MYSQL_DATABASE: ${MYSQL_DATABASE}             # banco criado na primeira subida
+      MYSQL_USER: ${MYSQL_USER}                     # usuário da aplicação (não é root)
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: America/Sao_Paulo
+    ports:
+      - "127.0.0.1:3306:3306"             # só acessível pela sua máquina, não pela rede
+    volumes:
+      - mysql_data:/var/lib/mysql         # dados persistem fora do container
+    mem_limit: 1g                         # teto de RAM (sua máquina tem ~16 GB)
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:${QDRANT_VERSION}    # versão fixada no .env
+    container_name: catalogo-qdrant
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}   # exige chave em toda requisição
+    ports:
+      - "127.0.0.1:6333:6333"             # API REST + dashboard web
+    volumes:
+      - qdrant_data:/qdrant/storage
+    mem_limit: 1g
+
+volumes:
+  mysql_data:
+  qdrant_data:

@@ -1,0 +1,9 @@
+pandas
+openpyxl
+sqlalchemy
+pymysql
+cryptography
+qdrant-client
+ollama
+streamlit
+python-dotenv

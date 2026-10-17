@@ -1,0 +1,11 @@
+# Configuração do Streamlit para o protótipo
+
+[server]
+# Só a própria máquina acessa a interface (o padrão do Streamlit é abrir para toda a rede)
+address = "127.0.0.1"
+port = 8501
+
+[browser]
+# Não enviar estatísticas de uso para o Streamlit
+gatherUsageStats = false
+serverAddress = "127.0.0.1"
