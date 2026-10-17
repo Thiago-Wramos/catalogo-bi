@@ -11,13 +11,20 @@ No caso "sem_acesso", NENHUM nome de relatório ou view é devolvido:
 a busca sem filtro serve só para saber SE o assunto existe.
 """
 
+import difflib
 import os
+import re
 
 import ollama
 from qdrant_client import models
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from banco import COLECAO_QDRANT, MODELO_EMBEDDING, criar_engine, criar_qdrant
+from indexar_qdrant import id_estavel
+
+# Nomes exatos citados na pergunta: "VW_SALARIO", "BI 201"
+RE_VIEW = re.compile(r"\bVW_[A-Z0-9_]+\b")
+RE_BI = re.compile(r"\bBI\s*(\d{3})\b", re.IGNORECASE)
 
 # Parâmetros de relevância (calibrados com testar_busca.py; ajustáveis no .env)
 SCORE_MINIMO = float(os.getenv("SCORE_MINIMO", "0.45"))     # abaixo disso, o catálogo não tem o assunto
@@ -105,6 +112,59 @@ def pesquisar(cliente, vetor, filtro, limite):
     ).points
 
 
+def views_visiveis(engine, acesso):
+    """Nomes das views usadas pelos relatórios que o usuário pode ver."""
+    if not acesso["relatorios_visiveis"]:
+        return []
+    sql = text("""
+        SELECT DISTINCT v.nome
+        FROM view_dados v
+        JOIN relatorio_view rv ON rv.view_id = v.id
+        JOIN relatorio r       ON r.id = rv.relatorio_id
+        WHERE r.codigo IN :codigos
+    """).bindparams(bindparam("codigos", expanding=True))
+    with engine.connect() as conn:
+        return conn.execute(sql, {"codigos": sorted(acesso["relatorios_visiveis"])}).scalars().all()
+
+
+def busca_exata(engine, cliente, pergunta, acesso):
+    """
+    Se a pergunta cita um nome exato (VW_... ou BI 123), resolve pelo nome,
+    sem embedding. Devolve None só quando a pergunta não cita nenhum nome.
+    """
+    views = set(RE_VIEW.findall(pergunta.upper()))
+    codigos = set(RE_BI.findall(pergunta))
+    if not views and not codigos:
+        return None
+
+    ids = [id_estavel(f"view:{v}") for v in views] + [id_estavel(f"relatorio:{c}") for c in codigos]
+    pontos = cliente.retrieve(collection_name=COLECAO_QDRANT, ids=ids, with_payload=True)
+
+    if not pontos:
+        # Nenhum nome citado existe. Sugere nomes parecidos, mas SÓ entre as views
+        # que o usuário enxerga: sugerir uma view de outra área seria um vazamento.
+        candidatas = views_visiveis(engine, acesso)
+        sugestoes = sorted({
+            s for v in views for s in difflib.get_close_matches(v, candidatas, n=2, cutoff=0.8)
+        })
+        citados = sorted(views) + [f"BI {c}" for c in sorted(codigos)]
+        return {"status": "nao_encontrado", "resultados": [], "score_global": 0.0, "score_visivel": 0.0,
+                "nomes_inexistentes": citados, "sugestoes": sugestoes}
+
+    # Mesma regra do filtro do Qdrant: alguma role em comum, ou acesso total
+    visiveis = [
+        p for p in pontos
+        if acesso["acesso_total"] or set(p.payload["roles"]) & set(acesso["roles"])
+    ]
+    if visiveis:
+        resultados = [{**limpar_resultado(p.payload, acesso), "score": 1.0} for p in visiveis]
+        return {"status": "encontrado", "resultados": resultados,
+                "score_global": 1.0, "score_visivel": 1.0}
+
+    status = "sem_acesso" if POLITICA_SEM_ACESSO == "indicar" else "nao_encontrado"
+    return {"status": status, "resultados": [], "score_global": 1.0, "score_visivel": 0.0}
+
+
 # =====================================================================
 # 3. A CONSULTA COMPLETA
 # =====================================================================
@@ -114,6 +174,11 @@ def consultar(pergunta, login, limite=5, engine=None, cliente=None):
 
     with engine.connect() as conn:
         acesso = obter_acesso(conn, login)
+
+    # Nome exato citado na pergunta? Resolve pelo nome, sem embedding.
+    exata = busca_exata(engine, cliente, pergunta, acesso)
+    if exata:
+        return {**exata, "acesso": acesso}
 
     vetor = ollama.embed(model=MODELO_EMBEDDING, input=pergunta).embeddings[0]
 

@@ -251,6 +251,12 @@ def _responder(pergunta, login, engine, cliente):
     if busca["status"] == "sem_acesso":
         return {**saida, "resposta": MSG_SEM_ACESSO, "origem": "fixa"}
     if busca["status"] == "nao_encontrado":
+        if busca.get("nomes_inexistentes"):
+            # A pergunta citou um nome exato que não existe no catálogo
+            texto = f"Não encontrei {', '.join(busca['nomes_inexistentes'])} no catálogo."
+            if busca.get("sugestoes"):
+                texto += f" Você quis dizer: {', '.join(busca['sugestoes'])}?"
+            return {**saida, "resposta": texto, "origem": "fixa"}
         return {**saida, "resposta": MSG_NAO_ENCONTRADO, "origem": "fixa"}
 
     # --- encontrado: montar contexto e chamar o Qwen
