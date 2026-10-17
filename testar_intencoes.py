@@ -27,6 +27,10 @@ DEVEM_RECONHECER = [
     ("saudacao", "boa tarde, tudo certo?"),
     ("agradecimento", "vlw"),
     ("agradecimento", "obrigado pela ajuda, era isso"),
+    # Listar (frases que não estão nos exemplos)
+    ("listar", "que relatórios estão liberados pra mim?"),
+    ("listar", "me mostra tudo que eu posso acessar"),
+    ("listar", "quais são os meus BIs?"),
 ]
 
 # Perguntas de catálogo: precisam seguir para a busca normal
@@ -41,6 +45,13 @@ NAO_PODEM_RECONHECER = [
     "Opa, quais relatórios mostram vendas?",
     "Como funciona o cálculo da margem de contribuição?",
     "O que o relatório de chamados de TI mostra?",
+    # Parecem "listar", mas pedem um ASSUNTO: precisam ir para a busca
+    "Quais relatórios mostram vendas?",
+    "Quais relatórios têm dados de salário?",
+    "Que relatório eu uso para ver o headcount?",
+    # Têm palavra de posse E de assunto: a regra 2 precisa mandar para a busca
+    "Eu tenho acesso a dados de vendas?",
+    "Posso ver informações sobre salário?",
 ]
 
 
@@ -59,21 +70,28 @@ def main():
 
     print("\nNÃO podem ser reconhecidas (seguem para o catálogo):")
     maior_negativo = 0.0
+    bloqueadas = 0
     for frase in NAO_PODEM_RECONHECER:
         r = classificar(frase)
         ok = r["intencao"] is None
         erros += not ok
-        maior_negativo = max(maior_negativo, r["score"])
-        print(f"  {'OK  ' if ok else 'ERRO'} [{r['score']}] {frase!r:<42} (parecida com: {r['frase_mais_parecida']!r})")
+        if r["bloqueada_pela_regra"]:
+            bloqueadas += 1
+            nota = "  <- bloqueada pela regra do 'listar'"
+        else:
+            maior_negativo = max(maior_negativo, r["score"])
+            nota = ""
+        print(f"  {'OK  ' if ok else 'ERRO'} [{r['score']}] {frase!r:<42} "
+              f"(parecida com: {r['frase_mais_parecida']!r}){nota}")
 
     print("\n" + "-" * 70)
-    print(f"Menor score entre as que devem ser reconhecidas: {menor_positivo}")
-    print(f"Maior score entre as perguntas de catálogo:      {maior_negativo}")
+    print(f"Perguntas de catálogo barradas pela regra do 'listar': {bloqueadas}")
+    print(f"Menor score entre as que devem ser reconhecidas:        {menor_positivo}")
+    print(f"Maior score entre as de catálogo (fora as barradas):    {maior_negativo}")
     if menor_positivo > maior_negativo:
-        sugestao = round((menor_positivo + maior_negativo) / 2, 3)
-        print(f"Os grupos estão separados. Limiar sugerido: {sugestao}")
+        print(f"Separadas. Folga entre os grupos: {round(menor_positivo - maior_negativo, 3)}")
     else:
-        print("Os grupos se SOBREPÕEM: nenhum limiar separa tudo. Revise os exemplos.")
+        print("Os grupos se SOBREPÕEM mesmo com a regra. Revise os exemplos.")
     print(f"Erros com o limiar atual: {erros}")
 
 

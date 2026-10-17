@@ -29,6 +29,9 @@ CASOS = [
     ("usr_comercial", "pra que você serve?"),
     ("usr_admin", "bom dia"),
     ("usr_corporativo", "valeu"),
+    # Listar: a resposta precisa trazer TODOS os relatórios do perfil
+    ("usr_comercial", "eu tenho acesso a quais relatórios?"),
+    ("usr_rh", "quais são os meus BIs?"),
 ]
 
 
@@ -59,6 +62,10 @@ def rodar(casos):
         print(r["resposta"])
         if vaz:
             print(f"!!! VAZAMENTO: citou {sorted(vaz)}")
+        if r["status"] == "lista":
+            citados, _ = citacoes(r["resposta"])
+            faltando = acesso["relatorios_visiveis"] - citados
+            print(f">>> Lista completa: {'SIM' if not faltando else 'NÃO, faltam ' + str(sorted(faltando))}")
 
     print("\n" + "=" * 78)
     print(f"Respostas do Qwen aprovadas: {origens['llm']} | "

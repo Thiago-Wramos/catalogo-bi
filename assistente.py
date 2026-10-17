@@ -85,7 +85,8 @@ def mensagem_ajuda(acesso, areas):
         "**O que eu posso fazer**\n"
         "- Dizer onde encontrar uma informação (ex.: \"em qual relatório encontro dados sobre <assunto>?\")\n"
         "- Dizer quais views um relatório utiliza\n"
-        "- Avisar quando uma view contém dados sensíveis\n\n"
+        "- Avisar quando uma view contém dados sensíveis\n"
+        "- Listar todos os relatórios liberados para você (ex.: \"quais relatórios eu tenho acesso?\")\n\n"
         "**O que eu não faço**\n"
         "- Mostrar os dados em si (valores, totais ou registros)\n"
         "- Mostrar relatórios fora do seu perfil de acesso\n"
@@ -93,6 +94,29 @@ def mensagem_ajuda(acesso, areas):
         "- Responder assuntos fora do catálogo\n\n"
         f"**Seu perfil:** {perfil}. Você pode perguntar sobre relatórios destas áreas: {lista_areas}."
     )
+
+
+def mensagem_lista(engine, acesso):
+    """Lista COMPLETA dos relatórios do usuário, direto do MySQL (sem busca e sem Qwen)."""
+    codigos = acesso["relatorios_visiveis"]
+    if not codigos:
+        return "Seu perfil ainda não tem nenhum relatório liberado. Fale com a equipe de BI."
+
+    sql = text(
+        "SELECT codigo, nome, area FROM relatorio WHERE codigo IN :codigos ORDER BY area, codigo"
+    ).bindparams(bindparam("codigos", expanding=True))
+    with engine.connect() as conn:
+        linhas = conn.execute(sql, {"codigos": sorted(codigos)}).all()
+
+    partes = [f"Você tem acesso a **{len(linhas)} relatórios**:"]
+    area_atual = None
+    for codigo, nome, area in linhas:
+        if area != area_atual:
+            partes.append(f"\n**{area or 'Sem área'}**")
+            area_atual = area
+        partes.append(f"- BI {codigo} - {nome}")
+    partes.append("\nPara saber em qual deles está uma informação, é só perguntar.")
+    return "\n".join(partes)
 
 
 # =====================================================================
@@ -206,6 +230,8 @@ def _responder(pergunta, login, engine, cliente):
     if intencao == "ajuda":
         areas = areas_visiveis(engine, acesso["relatorios_visiveis"])
         return {**saida, "status": "ajuda", "resposta": mensagem_ajuda(acesso, areas), "origem": "fixa"}
+    if intencao == "listar":
+        return {**saida, "status": "lista", "resposta": mensagem_lista(engine, acesso), "origem": "fixa"}
     if intencao == "saudacao":
         return {**saida, "status": "saudacao", "resposta": MSG_SAUDACAO, "origem": "fixa"}
     if intencao == "agradecimento":

@@ -31,6 +31,7 @@ EXATAS = {
     "agradecimento": {"obrigado", "obrigada", "brigado", "brigada", "obg", "vlw", "valeu",
                       "brigadão", "obrigadão", "show", "top", "beleza", "blz", "massa"},
     "ajuda": {"ajuda", "help", "socorro", "menu"},
+    "listar": {"listar", "lista", "meus relatórios", "meus relatorios", "meus bis"},
 }
 
 EXEMPLOS = {
@@ -48,6 +49,15 @@ EXEMPLOS = {
         "para que você serve?",
         "que tipo de pergunta eu posso fazer?",
     ],
+    "listar": [
+        "quais relatórios eu tenho acesso?",
+        "eu tenho acesso a quais relatórios?",
+        "liste os meus relatórios",
+        "quais relatórios eu posso ver?",
+        "mostre todos os relatórios disponíveis para mim",
+        "quais BIs estão liberados para o meu perfil?",
+        "a que relatórios eu tenho acesso?",
+    ],
     "saudacao": [
         "oi",
         "olá",
@@ -64,6 +74,21 @@ EXEMPLOS = {
         "perfeito, obrigado",
     ],
 }
+
+# "Listar" usa o mesmo vocabulário das perguntas de catálogo ("quais relatórios...").
+# O embedding sozinho não separa "quais relatórios EU TENHO?" de "quais relatórios
+# mostram VENDAS?". Por isso, para "listar", o embedding é só o primeiro filtro:
+#   1) a frase precisa falar de posse/acesso do próprio usuário
+#   2) e não pode citar um assunto
+POSSE = re.compile(
+    r"\b(tenho|meus|minhas|liberad[oa]s?|dispon[ií]ve(l|is) (para|pra) mim|"
+    r"(para|pra) mim|posso (ver|acessar)|meu perfil)\b",
+    re.IGNORECASE,
+)
+ASSUNTO = re.compile(
+    r"\b(dados?|informa[çc](ão|ao|ões|oes)|sobre|base)\b",
+    re.IGNORECASE,
+)
 
 _vetores_exemplos = None  # calculados uma vez só, na primeira pergunta
 
@@ -110,9 +135,18 @@ def classificar(pergunta):
         (_similaridade(vetor, v), intencao, frase) for intencao, frase, v in _carregar_exemplos()
     )
 
+    reconhecida = intencao if score >= LIMIAR_INTENCAO else None
+
+    # 3) Regra extra para "listar": evita confundir com perguntas de catálogo
+    bloqueada = False
+    if reconhecida == "listar" and (not POSSE.search(pergunta) or ASSUNTO.search(pergunta)):
+        reconhecida = None
+        bloqueada = True
+
     return {
-        "intencao": intencao if score >= LIMIAR_INTENCAO else None,
+        "intencao": reconhecida,
         "score": round(score, 3),
         "candidata": intencao,
         "frase_mais_parecida": frase,
+        "bloqueada_pela_regra": bloqueada,
     }
